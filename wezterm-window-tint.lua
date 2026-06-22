@@ -29,6 +29,7 @@ local project_roots = {}
 local used_indices = {}
 local used_index_count = 0
 local window_state = {}
+local handlers_registered = false
 
 math.randomseed(os.time())
 
@@ -99,10 +100,15 @@ local function project_root_for_cwd(cwd)
   end
 
   local dir = cwd:gsub('/+$', '')
+  local home = os.getenv('HOME')
+  local stop = (home and home ~= '' and home:gsub('/+$', '')) or nil
   local root = dir
   while dir do
     if exists(dir .. '/.git') then
       root = dir
+      break
+    end
+    if stop and dir == stop then
       break
     end
     dir = dirname(dir)
@@ -122,7 +128,7 @@ local function random_seed(root, attempt)
   }, ':')
 end
 
-local function assign_color(root)
+local function assign_color(root, ephemeral)
   if not root or root == '' then
     return nil
   end
@@ -131,23 +137,20 @@ local function assign_color(root)
   end
 
   local colors = config_opts.palette
-  local seed = nil
-  if used_index_count < #colors then
-    for attempt = 1, 200 do
-      local candidate = random_seed(root, attempt)
-      local index = hash_to_index(candidate, #colors)
-      if not used_indices[index] then
-        seed = candidate
-        break
-      end
+  local index = nil
+  for attempt = 1, 200 do
+    local candidate = random_seed(root, attempt)
+    local candidate_index = hash_to_index(candidate, #colors)
+    if not used_indices[candidate_index] then
+      index = candidate_index
+      break
     end
   end
-  if not seed then
-    seed = random_seed(root)
+  if not index then
+    index = hash_to_index(root, #colors)
   end
 
-  local index = hash_to_index(seed, #colors)
-  if not used_indices[index] then
+  if not ephemeral and not used_indices[index] then
     used_indices[index] = true
     used_index_count = used_index_count + 1
   end
@@ -155,7 +158,6 @@ local function assign_color(root)
     name = colors[index].name,
     hex = colors[index].hex,
     root = root,
-    seed = seed,
     index = index,
   }
   project_colors[root] = color
@@ -170,7 +172,7 @@ local function color_for_pane(pane)
   local cwd = cwd_from_uri(pane:get_current_working_dir())
   local root = project_root_for_cwd(cwd)
   if not root then
-    root = 'pane:' .. tostring(pane:pane_id())
+    return assign_color('pane:' .. tostring(pane:pane_id()), true)
   end
   return assign_color(root)
 end
@@ -280,6 +282,11 @@ function M.apply_to_config(config, opts)
     config.use_fancy_tab_bar = false
   end
   config.status_update_interval = config_opts.retint_interval_seconds * 1000
+
+  if handlers_registered then
+    return
+  end
+  handlers_registered = true
 
   wezterm.on('update-status', function(window, pane)
     apply_window_tint(window, pane, color_for_pane(pane))
