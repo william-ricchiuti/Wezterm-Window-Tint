@@ -31,8 +31,6 @@ local used_index_count = 0
 local window_state = {}
 local handlers_registered = false
 
-math.randomseed(os.time())
-
 local function fnv1a(str)
   local hash = 2166136261
   for i = 1, #str do
@@ -44,6 +42,52 @@ end
 
 local function hash_to_index(seed, count)
   return (fnv1a(tostring(seed or 'default')) % count) + 1
+end
+
+local function hex_to_hue(hex)
+  if type(hex) ~= 'string' or #hex < 7 then
+    return 0
+  end
+  local r = (tonumber(hex:sub(2, 3), 16) or 0) / 255
+  local g = (tonumber(hex:sub(4, 5), 16) or 0) / 255
+  local b = (tonumber(hex:sub(6, 7), 16) or 0) / 255
+  local max = math.max(r, g, b)
+  local min = math.min(r, g, b)
+  local d = max - min
+  if d == 0 then
+    return 0
+  end
+  local h
+  if max == r then
+    h = ((g - b) / d) % 6
+  elseif max == g then
+    h = (b - r) / d + 2
+  else
+    h = (r - g) / d + 4
+  end
+  return (h * 60) % 360
+end
+
+local function hue_distance(a, b)
+  local d = math.abs(a - b) % 360
+  if d > 180 then
+    d = 360 - d
+  end
+  return d
+end
+
+local palette_hues = nil
+local palette_hues_for = nil
+local function ensure_palette_hues()
+  local colors = config_opts.palette
+  if palette_hues_for == colors then
+    return
+  end
+  palette_hues = {}
+  for i, c in ipairs(colors) do
+    palette_hues[i] = hex_to_hue(c.hex)
+  end
+  palette_hues_for = colors
 end
 
 local function exists(path)
@@ -118,14 +162,43 @@ local function project_root_for_cwd(cwd)
   return root
 end
 
-local function random_seed(root, attempt)
-  return table.concat({
-    'windowtint',
-    tostring(os.time()),
-    tostring(math.random()),
-    tostring(attempt or 0),
-    tostring(root or ''),
-  }, ':')
+local function pick_diverse_index(root)
+  ensure_palette_hues()
+  local colors = config_opts.palette
+  local n = #colors
+  if used_index_count >= n then
+    return hash_to_index(root, n)
+  end
+  if used_index_count == 0 then
+    return hash_to_index(root, n)
+  end
+
+  local best_score = -1
+  local best = {}
+  for i = 1, n do
+    if not used_indices[i] then
+      local min_d = 360
+      for j = 1, n do
+        if used_indices[j] then
+          local d = hue_distance(palette_hues[i], palette_hues[j])
+          if d < min_d then
+            min_d = d
+          end
+        end
+      end
+      if min_d > best_score then
+        best_score = min_d
+        best = { i }
+      elseif min_d == best_score then
+        best[#best + 1] = i
+      end
+    end
+  end
+
+  if #best == 0 then
+    return hash_to_index(root, n)
+  end
+  return best[hash_to_index(root, #best)]
 end
 
 local function assign_color(root, ephemeral)
@@ -137,18 +210,7 @@ local function assign_color(root, ephemeral)
   end
 
   local colors = config_opts.palette
-  local index = nil
-  for attempt = 1, 200 do
-    local candidate = random_seed(root, attempt)
-    local candidate_index = hash_to_index(candidate, #colors)
-    if not used_indices[candidate_index] then
-      index = candidate_index
-      break
-    end
-  end
-  if not index then
-    index = hash_to_index(root, #colors)
-  end
+  local index = pick_diverse_index(root)
 
   if not ephemeral and not used_indices[index] then
     used_indices[index] = true
