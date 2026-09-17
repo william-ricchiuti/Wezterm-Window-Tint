@@ -23,7 +23,7 @@ Options:
   --config-dir <path>  Install into a custom WezTerm config directory.
 
 Recommended native WezTerm install:
-  local window_tint = wezterm.plugin.require('https://github.com/willytop8/Wezterm-Window-Tint')
+  local window_tint = wezterm.plugin.require('https://github.com/william-ricchiuti/Wezterm-Window-Tint')
 `)
 }
 

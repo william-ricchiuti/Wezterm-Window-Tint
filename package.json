@@ -3,14 +3,14 @@
   "version": "0.1.6",
   "description": "Project-aware window tinting for WezTerm.",
   "license": "MIT",
-  "author": "willytop8",
-  "homepage": "https://github.com/willytop8/Wezterm-Window-Tint#readme",
+  "author": "William Ricchiuti",
+  "homepage": "https://github.com/william-ricchiuti/Wezterm-Window-Tint#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/willytop8/Wezterm-Window-Tint.git"
+    "url": "git+https://github.com/william-ricchiuti/Wezterm-Window-Tint.git"
   },
   "bugs": {
-    "url": "https://github.com/willytop8/Wezterm-Window-Tint/issues"
+    "url": "https://github.com/william-ricchiuti/Wezterm-Window-Tint/issues"
   },
   "keywords": [
     "wezterm",
